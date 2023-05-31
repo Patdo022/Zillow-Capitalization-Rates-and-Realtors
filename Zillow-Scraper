@@ -1,0 +1,76 @@
+from asyncio.format_helpers import extract_stack
+import requests
+import pandas as pd
+import json
+import matplotlib.pyplot as plt
+from sqlalchemy import create_engine
+import pyodbc
+import numpy as np
+from datetime import datetime
+from bs4 import BeautifulSoup
+import time
+import regex as re
+from threading import Thread
+
+headers = {
+    "User-Agent": "",
+    "Accept": "gzip,deflate,br",
+    "Accept-Language": "en-US,en;q=0.5",
+    "Pragma": "no-cache"
+}
+engine = create_engine(
+    'mssql+pyodbc://'
+    '@./?' # username:pwd@server:port/database
+    'driver=ODBC+Driver+17+for+SQL+Server')
+full_list = {'link':[],'address':[],'price':[],'beds':[],'baths':[],'sqft':[],'longitude':[],'latitude':[],'zestimate':[],'rentzestimate':[],'realtor':[],'hometype':[],'taxvalue':[],'collectiondate':[]}
+full_list1 = {'email':[],'features':[],'desc':[],'zpid':[]}
+price1 = 100000
+price2 = 250000
+def ZillowScraper():
+    for page in range(1,2):
+        time.sleep(np.random.randint(5,10))
+        r = requests.get('https://www.zillow.com/boston-ma/sold/'+str(page)+'_p/?searchQueryState=%7B%22usersSearchTerm%22%3A%22Lowell%2C%20MA%22%2C%22mapBounds%22%3A%7B%22north%22%3A42.451389648714844%2C%22east%22%3A-70.82652514648439%2C%22south%22%3A42.175170418497544%2C%22west%22%3A-71.26872485351564%7D%2C%22mapZoom%22%3A11%2C%22isMapVisible%22%3Atrue%2C%22filterState%22%3A%7B%22doz%22%3A%7B%22value%22%3A%2230%22%7D%2C%22fore%22%3A%7B%22value%22%3Afalse%7D%2C%22ah%22%3A%7B%22value%22%3Atrue%7D%2C%22sort%22%3A%7B%22value%22%3A%22days%22%7D%2C%22auc%22%3A%7B%22value%22%3Afalse%7D%2C%22nc%22%3A%7B%22value%22%3Afalse%7D%2C%22rs%22%3A%7B%22value%22%3Atrue%7D%2C%22fsbo%22%3A%7B%22value%22%3Afalse%7D%2C%22cmsn%22%3A%7B%22value%22%3Afalse%7D%2C%22fsba%22%3A%7B%22value%22%3Afalse%7D%7D%2C%22isListVisible%22%3Atrue%2C%22regionSelection%22%3A%5B%7B%22regionId%22%3A44269%2C%22regionType%22%3A6%7D%5D%2C%22pagination%22%3A%7B%22currentPage%22%3A'+str(page)+'%7D%7D',headers=headers)
+        if r.status_code==200:
+            soup = BeautifulSoup(r.text,'html.parser')
+            x = json.loads((soup.find('script',attrs={'data-zrr-shared-data-key':'mobileSearchPageStore'}).text).replace('<!--','').replace('-->',''))
+            if type(x) != None:
+                for a in x['cat1']['searchResults']['listResults']:
+                    try: full_list['link'].append(a['detailUrl'])
+                    except: full_list['link'].append('NaN')
+                    try: full_list['address'].append(a['address'])
+                    except: full_list['address'].append('NaN')
+                    try: full_list['price'].append(a['unformattedPrice'])
+                    except: full_list['price'].append('NaN')
+                    try: full_list['beds'].append(a['beds'])
+                    except: full_list['beds'].append('NaN')
+                    try: full_list['baths'].append(a['baths'])
+                    except: full_list['baths'].append('NaN')
+                    try: full_list['sqft'].append(a['area'])
+                    except: full_list['sqft'].append('NaN')
+                    try: full_list['longitude'].append(a['hdpData']['homeInfo']['longitude'])
+                    except: full_list['longitude'].append('NaN')
+                    try: full_list['latitude'].append(a['hdpData']['homeInfo']['latitude'])
+                    except: full_list['latitude'].append('NaN')
+                    try: full_list['hometype'].append(a['hdpData']['homeInfo']['homeType'])
+                    except: full_list['hometype'].append('NaN')
+                    try: full_list['zestimate'].append(a['hdpData']['homeInfo']['zestimate'])
+                    except: full_list['zestimate'].append('NaN')
+                    try: full_list['rentzestimate'].append(a['hdpData']['homeInfo']['rentZestimate'])
+                    except: full_list['rentzestimate'].append('NaN')
+                    try: full_list['taxvalue'].append(a['hdpData']['homeInfo']['taxAssessedValue'])
+                    except: full_list['taxvalue'].append('NaN')
+                    try: full_list['realtor'].append(a['brokerName'])
+                    except: full_list['realtor'].append('NaN')
+                    full_list['collectiondate'].append(datetime.now())
+            else:
+                print("Parser Error")
+            df = pd.DataFrame.from_dict(full_list)
+            print(df)
+            df.to_csv('')
+        else: print(page), r.status_code, r.close()
+
+ZillowScraper()
+
+
+scraper = Thread(target=ZillowScraper, daemon=True, name='ZillowScraper')
+scraper.start()

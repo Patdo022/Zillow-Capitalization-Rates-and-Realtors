@@ -1,0 +1,77 @@
+import pandas as pd
+from sqlalchemy import create_engine
+import pyodbc
+from folium import plugins
+from folium.plugins import HeatMap
+from folium.features import DivIcon
+from folium.plugins import FeatureGroupSubGroup
+import webbrowser
+import folium
+import branca.colormap as cm
+from collections import defaultdict
+import regex as re
+import numpy as np
+import math
+
+
+engine = create_engine(
+    'mssql+pyodbc://'
+    '@./?' # username:pwd@server:port/database
+    'driver=ODBC+Driver+17+for+SQL+Server')
+df = pd.read_sql('SELECT * FROM dbo.Massachusetts',engine)
+df = df[['address','price','beds','baths','sqft','longitude','latitude','zillowowned','zestimate','rentzestimate','foreclosure','realtor','hometype','dayslisted','taxvalue']]
+df = df.dropna()
+rentzestimate = []
+for x in df['rentzestimate']:
+   rentzestimate.append(int(x))
+df['rentzestimate'] = rentzestimate
+df['caprate'] = (df['rentzestimate']/df['price']*1000)
+latitude = df['latitude'].mean()
+longitude = df['longitude'].mean()
+
+
+realtors = df.groupby(df['realtor'])
+dayslisted = df.groupby(df['dayslisted'])
+hometypes = df.groupby(df['hometype'])
+totalrealtors = df['realtor'].count()
+
+
+colors = ['red', 'blue', 'green', 'purple', 'orange', 'darkred', 'lightred', 'beige',
+ 'darkblue', 'darkgreen', 'cadetblue', 'darkpurple', 'white', 'pink',
+ 'lightblue', 'lightgreen', 'gray', 'black', 'lightgray']
+
+capmap = folium.Map(location=[latitude,longitude])
+realtormap = folium.Map(location=[latitude,longitude])
+
+capslist = []
+realtorslist = []
+caps = df.groupby(df['caprate'].apply(lambda x: round(x)))
+
+for a,b in caps:
+    caprates = folium.FeatureGroup(name= (str(a) + "%"),overlay=True)
+    for c,row in b.iterrows():
+        caprates.add_child(folium.Marker(location=(row['latitude'],row['longitude']), icon=folium.Icon(color=colors[round(row['caprate'])]),popup=("Address:",row['address'],"CapRate:",row['caprate'] ) ))
+    caprates.add_to(capmap)
+
+for a,b in realtors:
+    realtors1 = folium.FeatureGroup(name=(a + " " + str(b['realtor'].count()) + " Properties"),overlay=True)
+    for c,row in b.iterrows():
+        realtors1.add_child(folium.Marker(location=(row['latitude'],row['longitude']), icon=folium.Icon(color='red'),popup=("Address:",row['address'],"Realtor:",row['realtor']) ))
+    realtors1.add_to(realtormap)
+
+
+capmap.add_child(folium.LayerControl())
+realtormap.add_child(folium.LayerControl())
+
+capmap.save("capmap.html")
+realtormap.save("realtormap.html")
+webbrowser.open("capmap.html")
+webbrowser.open("realtormap.html")
+   
+
+
+
+
+
+
+
